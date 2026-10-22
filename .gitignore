@@ -1,0 +1,46 @@
+# Unity generated
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+[Ee]xportedObj/
+[Ll]ocal[Bb]ackups/
+
+# IDE / generated project files
+.vs/
+.idea/
+.vscode/
+*.csproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.unityproj
+*.booproj
+*.pidb
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Unity/Burst generated artifacts
+/Data/
+mono_crash.*.blob
+mono_crash.*.json
+/[Aa]ssets/_Recovery/
+/[Aa]ssets/_Recovery.meta
+
+# Local-only deployment and load-test tooling
+/Deploy/
+/Tools/
+/_backup/
+/Packages/manifest.json.bak*
+
+# OS noise
+.DS_Store
+Thumbs.db

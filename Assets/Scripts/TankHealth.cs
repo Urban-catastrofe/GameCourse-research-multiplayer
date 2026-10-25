@@ -17,6 +17,7 @@ public class TankHealth : NetworkBehaviour
     [SerializeField] float barHeight = 2.6f;
     [SerializeField] Vector2 barSize = new Vector2(140f, 16f);
     [SerializeField] float barScale = 0.01f;
+    List<string> killfeedMessages = new List<string>();
 
     readonly NetworkVariable<int> health = new NetworkVariable<int>(
         100, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -103,6 +104,7 @@ public class TankHealth : NetworkBehaviour
         {
             dead.Value = true;
             AddKill(attackerId);
+            ShowKillfeedRpc(attackerId, OwnerClientId);
             StartCoroutine(RespawnAfterDelay());
         }
     }
@@ -213,20 +215,45 @@ public class TankHealth : NetworkBehaviour
 
     void OnGUI()
     {
-        if (!IsOwner) return;
-
-        if (hudStyle == null)
-            hudStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold };
-
-        if (hintStyle == null)
+        if (IsOwner)
         {
-            hintStyle = new GUIStyle(GUI.skin.label) { fontSize = 12 };
-            hintStyle.normal.textColor = new Color(1f, 1f, 1f, 0.7f);
+
+            if (hudStyle == null)
+                hudStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold };
+
+            if (hintStyle == null)
+            {
+                hintStyle = new GUIStyle(GUI.skin.label) { fontSize = 12 };
+                hintStyle.normal.textColor = new Color(1f, 1f, 1f, 0.7f);
+            }
+
+            GUI.Box(new Rect(12f, 12f, 430f, 64f), GUIContent.none);
+            GUI.Label(new Rect(26f, 17f, 400f, 26f), $"HP {health.Value}/{maxHealth}    Kills {kills.Value}", hudStyle);
+            GUI.Label(new Rect(26f, 45f, 420f, 22f),
+                "WASD rijden · Z/X toren · klik/space = schieten", hintStyle);
         }
 
-        GUI.Box(new Rect(12f, 12f, 430f, 64f), GUIContent.none);
-        GUI.Label(new Rect(26f, 17f, 400f, 26f), $"HP {health.Value}/{maxHealth}    Kills {kills.Value}", hudStyle);
-        GUI.Label(new Rect(26f, 45f, 420f, 22f),
-            "WASD rijden · Z/X toren · klik/space = schieten", hintStyle);
+        GUI.Box(new Rect(Screen.width - 320f, 12f, 300f, 170f), "Killfeed");
+
+        for (int i = 0; i < killfeedMessages.Count; i++)
+        {
+            GUI.Label(
+                new Rect(Screen.width - 310f, 40f + i * 26f, 280f, 24f),
+                killfeedMessages[i]
+            );
+        }
+    }
+
+    [Rpc(SendTo.ClientsAndHost)]
+    void ShowKillfeedRpc(ulong attackerId, ulong victimId)
+    {
+        string message = $"Player {attackerId} killed Player {victimId}";
+
+        killfeedMessages.Insert(0, message);
+
+        if (killfeedMessages.Count > 5)
+            killfeedMessages.RemoveAt(killfeedMessages.Count - 1);
+
+        Debug.Log(message);
     }
 }

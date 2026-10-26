@@ -26,6 +26,8 @@ public class HoverVehicleController : NetworkBehaviour
     // Shots are fired horizontally along the hull/turret forward; the camera only
     // provides the view, it does not control the shot direction.
 
+    public Animator animator;
+
     Rigidbody rb;
     TankHealth health;
     Vector3 groundNormal = Vector3.up;
@@ -115,16 +117,37 @@ public class HoverVehicleController : NetworkBehaviour
         turnInput = 0f;
 
         if (keyboard.upArrowKey.isPressed || keyboard.wKey.isPressed)
+        {
             moveInput += 1f;
-
-        if (keyboard.downArrowKey.isPressed || keyboard.sKey.isPressed)
+            animator.SetInteger("WheelAnimation", 1);
+        }
+        else if (keyboard.downArrowKey.isPressed || keyboard.sKey.isPressed)
+        {
             moveInput -= 1f;
+            animator.SetInteger("WheelAnimation", 2);
+        }
+        else
+        {
+            animator.SetInteger("WheelAnimation", 0);
+        }
 
         if (keyboard.rightArrowKey.isPressed || keyboard.dKey.isPressed)
             turnInput += 1f;
 
         if (keyboard.leftArrowKey.isPressed || keyboard.aKey.isPressed)
             turnInput -= 1f;
+
+
+        if (animator != null)
+        {
+            // 1. Check de waarde van je parameter
+            int wheelParam = animator.GetInteger("WheelAnimation");
+
+            // 2. Check direct of de Animator daadwerkelijk in de 'Spin' state is
+            bool isSpinning = animator.GetCurrentAnimatorStateInfo(0).IsName("Spin");
+
+            Debug.Log($"WheelAnimation Parameter: {wheelParam} | Zit in Spin State: {isSpinning}");
+        }
 
 #if UNITY_EDITOR
         if (DebugMove != 0f || DebugTurn != 0f)

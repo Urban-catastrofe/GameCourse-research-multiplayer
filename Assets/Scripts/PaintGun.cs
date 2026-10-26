@@ -227,7 +227,11 @@ public class PaintGun : NetworkBehaviour
     {
         var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
         var collider = quad.GetComponent<Collider>();
-        if (collider != null) Destroy(collider);
+        if (collider != null) 
+        {
+            collider.enabled = false;
+            Destroy(collider);
+        }
 
         if (parent != null)
             quad.transform.SetParent(parent, true);

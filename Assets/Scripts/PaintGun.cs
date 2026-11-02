@@ -226,8 +226,11 @@ public class PaintGun : NetworkBehaviour
     void SpawnSplat(Transform parent, Vector3 point, Vector3 normal)
     {
         var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        
+        // Gebruik DestroyImmediate zodat de collider direct verdwijnt
+        // vóórdat de quad aan de tank (met Rigidbody) wordt gekoppeld.
         var collider = quad.GetComponent<Collider>();
-        if (collider != null) Destroy(collider);
+        if (collider != null) DestroyImmediate(collider);
 
         if (parent != null)
             quad.transform.SetParent(parent, true);

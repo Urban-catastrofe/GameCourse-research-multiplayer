@@ -22,6 +22,9 @@ public class HoverVehicleController : NetworkBehaviour
     [SerializeField] LayerMask groundMask;
     [SerializeField] Vector2 cornerXZ = new Vector2(1.1f, 1.5f);
 
+    [Header("Animation")]
+    [SerializeField] Animator animator;
+
     [Header("Aim")]
     // Shots are fired horizontally along the hull/turret forward; the camera only
     // provides the view, it does not control the shot direction.
@@ -125,6 +128,16 @@ public class HoverVehicleController : NetworkBehaviour
 
         if (keyboard.leftArrowKey.isPressed || keyboard.aKey.isPressed)
             turnInput -= 1f;
+
+        if (animator != null)
+        {
+            animator.SetFloat("AnimationSpeed", moveInput);
+        }
+
+        // if (networkAnimator != null && networkAnimator.Animator != null)
+        // {
+        //     networkAnimator.Animator.SetFloat("AnimationSpeed", moveInput);
+        // }
 
 #if UNITY_EDITOR
         if (DebugMove != 0f || DebugTurn != 0f)

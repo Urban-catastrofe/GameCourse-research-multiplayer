@@ -19,8 +19,9 @@ public class TankHealth : NetworkBehaviour
     [SerializeField] float barScale = 0.01f;
     List<string> killfeedMessages = new List<string>();
 
-    readonly NetworkVariable<int> health = new NetworkVariable<int>(
-        100, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private int healthWithoutNetworkVariable = 100;
+    //readonly NetworkVariable<int> health = new NetworkVariable<int>(
+    //  100, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     readonly NetworkVariable<int> kills = new NetworkVariable<int>(
         0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     readonly NetworkVariable<bool> dead = new NetworkVariable<bool>(
@@ -37,18 +38,18 @@ public class TankHealth : NetworkBehaviour
     GUIStyle hintStyle;
 
     public bool IsDead => dead.Value;
-    public int Health => health.Value;
+    public int Health => healthWithoutNetworkVariable;
     public int Kills => kills.Value;
 
     public override void OnNetworkSpawn()
     {
         if (IsServer)
         {
-            health.Value = maxHealth;
+            healthWithoutNetworkVariable = maxHealth;
             dead.Value = false;
         }
 
-        health.OnValueChanged += OnHealthChanged;
+        //health.OnValueChanged += OnHealthChanged;
         dead.OnValueChanged += OnDeadChanged;
         respawnTick.OnValueChanged += OnRespawnTickChanged;
 
@@ -60,7 +61,7 @@ public class TankHealth : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
-        health.OnValueChanged -= OnHealthChanged;
+        //health.OnValueChanged -= OnHealthChanged;
         dead.OnValueChanged -= OnDeadChanged;
         respawnTick.OnValueChanged -= OnRespawnTickChanged;
     }
@@ -98,9 +99,9 @@ public class TankHealth : NetworkBehaviour
         if (!IsServer || dead.Value) return;
         if (attackerId == OwnerClientId) return; // no self-damage
 
-        health.Value = Mathf.Max(0, health.Value - amount);
+        healthWithoutNetworkVariable = Mathf.Max(0, healthWithoutNetworkVariable - amount);
 
-        if (health.Value <= 0)
+        if (healthWithoutNetworkVariable <= 0)
         {
             dead.Value = true;
             AddKill(attackerId);
@@ -123,7 +124,7 @@ public class TankHealth : NetworkBehaviour
         yield return new WaitForSeconds(respawnDelay);
         if (!IsServer) yield break;
 
-        health.Value = maxHealth;
+        healthWithoutNetworkVariable = maxHealth;
         dead.Value = false;
         respawnTick.Value++;
     }
@@ -192,7 +193,7 @@ public class TankHealth : NetworkBehaviour
     {
         if (fill == null) return;
 
-        float f = Mathf.Clamp01(health.Value / (float)Mathf.Max(1, maxHealth));
+        float f = Mathf.Clamp01(healthWithoutNetworkVariable / (float)Mathf.Max(1, maxHealth));
         var rt = fill.rectTransform;
         rt.anchorMax = new Vector2(Mathf.Lerp(0.02f, 0.98f, f), 0.85f);
         rt.offsetMin = Vector2.zero;
@@ -228,7 +229,7 @@ public class TankHealth : NetworkBehaviour
             }
 
             GUI.Box(new Rect(12f, 12f, 430f, 64f), GUIContent.none);
-            GUI.Label(new Rect(26f, 17f, 400f, 26f), $"HP {health.Value}/{maxHealth}    Kills {kills.Value}", hudStyle);
+            GUI.Label(new Rect(26f, 17f, 400f, 26f), $"HP {healthWithoutNetworkVariable}/{maxHealth}    Kills {kills.Value}", hudStyle);
             GUI.Label(new Rect(26f, 45f, 420f, 22f),
                 "WASD rijden · Z/X toren · klik/space = schieten", hintStyle);
         }

@@ -1,11 +1,10 @@
-using TankDemo.Networking.Server;
 using Unity.Netcode;
 using UnityEngine;
 
 namespace TankDemo.Networking.Client
 {
     /// <summary>
-    /// Tiny connection UI: host/port + Join, plus local host/server shortcuts.
+    /// Client connection UI: host/port + Join, and Leave while connected.
     /// Builds auto-connect to 127.0.0.1; pass -ip/-port for anything else.
     /// </summary>
     public class ConnectionView : MonoBehaviour
@@ -17,7 +16,6 @@ namespace TankDemo.Networking.Client
         private NetworkManager nm;
         private string hostText = "127.0.0.1";
         private string portText = "7777";
-        private string localServerStatus = "";
         private float connectedAt = -1f;
 
         public void Initialize(ClientConnectionController controller, NetworkManager nm)
@@ -64,12 +62,9 @@ namespace TankDemo.Networking.Client
             {
                 GUILayout.BeginArea(new Rect(12, Screen.height - 96, 460, 86), GUI.skin.box);
                 GUILayout.Label("network: " + controller.State + " - " + controller.Status);
-                if (!string.IsNullOrEmpty(localServerStatus))
-                    GUILayout.Label(localServerStatus);
 #if UNITY_EDITOR
-                if (GUILayout.Button("Shutdown"))
+                if (GUILayout.Button("Leave"))
                 {
-                    localServerStatus = "";
                     controller.Leave();
                 }
 #endif
@@ -91,14 +86,9 @@ namespace TankDemo.Networking.Client
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Join"))
             {
-                localServerStatus = "";
                 controller.SetEndpoint(hostText, ParsePort());
                 controller.Join();
             }
-            if (GUILayout.Button("Host local"))
-                localServerStatus = ServerBootstrap.StartLocalHost(nm, ParsePort()) ? "hosting on " + portText : "host failed";
-            if (GUILayout.Button("Server local"))
-                localServerStatus = ServerBootstrap.StartLocalServer(nm, ParsePort()) ? "server on " + portText : "server failed";
             GUILayout.EndHorizontal();
 
             GUILayout.Label("Join connects to the host/port above. No room service.");

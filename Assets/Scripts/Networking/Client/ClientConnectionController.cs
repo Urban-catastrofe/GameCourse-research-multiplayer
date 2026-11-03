@@ -108,9 +108,11 @@ namespace TankDemo.Networking.Client
             lastDisconnectReason = null;
 
             SetState(ConnectionState.Connecting, "Connecting to " + Host + ":" + Port + "...");
-            transport.ApplyClientEndpoint(Host, Port, nm);
 
-            if (!nm.StartClient())
+            // TODO 1: configure the destination and start the client.
+            bool clientStarted = false;
+
+            if (!clientStarted)
             {
                 Fail("Could not start the client. Is another session still running?");
                 yield break;
@@ -139,7 +141,7 @@ namespace TankDemo.Networking.Client
 
         private void HandleConnected(ulong _)
         {
-            sawConnected = true;
+            // TODO 2: record the successful connection for the waiting loop.
         }
 
         private void HandleDisconnected(ulong _)
@@ -147,16 +149,7 @@ namespace TankDemo.Networking.Client
             if (destroyed || leaveRequested || !Application.isPlaying)
                 return;
 
-            sawDisconnected = true;
-            lastDisconnectReason = nm != null ? nm.DisconnectReason : null;
-
-            if (State == ConnectionState.InGame)
-            {
-                string reason = string.IsNullOrEmpty(lastDisconnectReason)
-                    ? "server closed the connection"
-                    : lastDisconnectReason;
-                SetState(ConnectionState.Failed, "Disconnected: " + reason);
-            }
+            // TODO 3: record disconnection, capture the reason, and update an in-game UI.
         }
 
         private void Fail(string message)

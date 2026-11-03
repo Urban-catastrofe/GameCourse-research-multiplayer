@@ -1,4 +1,6 @@
 using Unity.Netcode;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -25,12 +27,25 @@ public class PaintGun : NetworkBehaviour
     [SerializeField] float impactTime = 0.25f;
     [SerializeField] Color shotColor = new Color(1f, 0.35f, 0.7f);
 
+    [Header("Workshop: latency and rollback")]
+    [SerializeField] bool workshopExerciseEnabled = true;
+    [SerializeField, Range(0f, 1.5f)] float simulatedServerDelay = 0.45f;
+
+    // OPGAVE 1: zet dit op true zodat de eigenaar direct lokale feedback krijgt.
+    static bool predictLocalShot = false;
+
+    // OPGAVE 2: zet dit op true zodat fout voorspelde feedback wordt opgeruimd.
+    static bool rollbackPredictedShot = false;
+
     Camera aimCamera;
     TankHealth health;
     float nextFireTime;
+    int nextShotId = 1;
+    readonly Dictionary<int, List<GameObject>> predictedShotObjects = new Dictionary<int, List<GameObject>>();
 
     static Material fxMaterial;
     static Material splatMaterial;
+    static Material predictedSplatMaterial;
     static Texture2D crosshair;
 
     public override void OnNetworkSpawn()
@@ -107,28 +122,132 @@ public class PaintGun : NetworkBehaviour
         }
 
         Vector3 muzzlePosition = muzzle != null ? muzzle.position : origin;
-        FireServerRpc(targetNetworkObjectId, muzzlePosition, endPoint, hitNormal, didHit);
+        int shotId = nextShotId++;
+
+        if (workshopExerciseEnabled && predictLocalShot)
+        {
+            predictedShotObjects[shotId] =
+                SpawnShotFx(targetNetworkObjectId, muzzlePosition, endPoint, hitNormal, didHit, true);
+        }
+
+        FireServerRpc(shotId, targetNetworkObjectId, muzzlePosition, endPoint, hitNormal, didHit);
     }
 
     [Rpc(SendTo.Server)]
-    void FireServerRpc(ulong targetNetworkObjectId, Vector3 muzzlePosition, Vector3 endPoint,
+    void FireServerRpc(int shotId, ulong targetNetworkObjectId, Vector3 muzzlePosition, Vector3 endPoint,
         Vector3 hitNormal, bool didHit, RpcParams rpcParams = default)
     {
-        if (targetNetworkObjectId != 0 &&
-            NetworkManager != null && NetworkManager.SpawnManager != null &&
-            NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(targetNetworkObjectId, out var target) &&
-            target.TryGetComponent<TankHealth>(out var targetHealth))
+        if (workshopExerciseEnabled && simulatedServerDelay > 0f)
         {
-            targetHealth.ApplyDamage(damage, rpcParams.Receive.SenderClientId);
+            StartCoroutine(FinishFireAfterDelay(shotId, targetNetworkObjectId, muzzlePosition, endPoint,
+                hitNormal, didHit, rpcParams.Receive.SenderClientId));
+            return;
         }
 
-        ShotFxClientRpc(targetNetworkObjectId, muzzlePosition, endPoint, hitNormal, didHit);
+        FinishFire(shotId, targetNetworkObjectId, muzzlePosition, endPoint, hitNormal, didHit,
+            rpcParams.Receive.SenderClientId);
+    }
+
+    IEnumerator FinishFireAfterDelay(int shotId, ulong targetNetworkObjectId, Vector3 muzzlePosition,
+        Vector3 endPoint, Vector3 hitNormal, bool didHit, ulong senderClientId)
+    {
+        yield return new WaitForSeconds(simulatedServerDelay);
+        FinishFire(shotId, targetNetworkObjectId, muzzlePosition, endPoint, hitNormal, didHit, senderClientId);
+    }
+
+    void FinishFire(int shotId, ulong predictedTargetNetworkObjectId, Vector3 muzzlePosition, Vector3 endPoint,
+        Vector3 hitNormal, bool didHit, ulong senderClientId)
+    {
+        ulong authoritativeTargetNetworkObjectId = predictedTargetNetworkObjectId;
+        Vector3 authoritativeEndPoint = endPoint;
+        Vector3 authoritativeHitNormal = hitNormal;
+        bool authoritativeDidHit = didHit;
+        bool acceptedPrediction = true;
+
+        if (workshopExerciseEnabled)
+        {
+            acceptedPrediction = ValidateShot(predictedTargetNetworkObjectId, muzzlePosition, endPoint,
+                out authoritativeTargetNetworkObjectId, out authoritativeEndPoint, out authoritativeHitNormal,
+                out authoritativeDidHit);
+        }
+
+        if (acceptedPrediction &&
+            authoritativeTargetNetworkObjectId != 0 &&
+            NetworkManager != null && NetworkManager.SpawnManager != null &&
+            NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(authoritativeTargetNetworkObjectId, out var target) &&
+            target.TryGetComponent<TankHealth>(out var targetHealth))
+        {
+            targetHealth.ApplyDamage(damage, senderClientId);
+        }
+
+        ShotFxClientRpc(shotId, authoritativeTargetNetworkObjectId, muzzlePosition, authoritativeEndPoint,
+            authoritativeHitNormal, authoritativeDidHit);
+    }
+
+    bool ValidateShot(ulong predictedTargetNetworkObjectId, Vector3 muzzlePosition, Vector3 predictedEndPoint,
+        out ulong authoritativeTargetNetworkObjectId, out Vector3 authoritativeEndPoint,
+        out Vector3 authoritativeHitNormal, out bool authoritativeDidHit)
+    {
+        authoritativeTargetNetworkObjectId = 0;
+        authoritativeEndPoint = predictedEndPoint;
+        authoritativeHitNormal = Vector3.zero;
+        authoritativeDidHit = false;
+
+        Vector3 direction = predictedEndPoint - muzzlePosition;
+        if (direction.sqrMagnitude < 0.0001f)
+            direction = muzzle != null ? muzzle.forward : transform.forward;
+
+        direction = Vector3.ProjectOnPlane(direction, Vector3.up);
+        if (direction.sqrMagnitude < 0.0001f)
+            direction = Vector3.ProjectOnPlane(transform.forward, Vector3.up);
+        direction.Normalize();
+
+        authoritativeEndPoint = muzzlePosition + direction * range;
+
+        var hits = Physics.RaycastAll(muzzlePosition, direction, range, hitMask, QueryTriggerInteraction.Ignore);
+        if (hits.Length > 0)
+        {
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+            ulong ownId = 0;
+            var ownNetworkObject = GetComponentInParent<NetworkObject>();
+            if (ownNetworkObject != null) ownId = ownNetworkObject.NetworkObjectId;
+
+            foreach (var hit in hits)
+            {
+                var hitNetworkObject = hit.collider.GetComponentInParent<NetworkObject>();
+                if (hitNetworkObject != null && hitNetworkObject.NetworkObjectId == ownId)
+                    continue;
+
+                authoritativeDidHit = true;
+                authoritativeEndPoint = hit.point;
+                authoritativeHitNormal = hit.normal;
+
+                if (hitNetworkObject != null && hitNetworkObject.IsSpawned)
+                    authoritativeTargetNetworkObjectId = hitNetworkObject.NetworkObjectId;
+
+                break;
+            }
+        }
+
+        return predictedTargetNetworkObjectId == authoritativeTargetNetworkObjectId;
     }
 
     [Rpc(SendTo.ClientsAndHost)]
-    void ShotFxClientRpc(ulong targetNetworkObjectId, Vector3 muzzlePosition, Vector3 endPoint,
+    void ShotFxClientRpc(int shotId, ulong targetNetworkObjectId, Vector3 muzzlePosition, Vector3 endPoint,
         Vector3 hitNormal, bool didHit)
     {
+        if (workshopExerciseEnabled && rollbackPredictedShot)
+            RollbackPredictedShot(shotId);
+
+        SpawnShotFx(targetNetworkObjectId, muzzlePosition, endPoint, hitNormal, didHit, false);
+    }
+
+    List<GameObject> SpawnShotFx(ulong targetNetworkObjectId, Vector3 muzzlePosition, Vector3 endPoint,
+        Vector3 hitNormal, bool didHit, bool predicted)
+    {
+        var spawnedObjects = predicted ? new List<GameObject>() : null;
+
         // The camera sits behind the tank, so when a target is very close the
         // ray can hit in front of the muzzle - stretch the tracer so it never
         // points backwards.
@@ -140,19 +259,41 @@ public class PaintGun : NetworkBehaviour
             tracerEnd = muzzlePosition + (delta.sqrMagnitude > 0.0001f ? delta.normalized : fallback) * 6f;
         }
 
-        SpawnTracer(muzzlePosition, tracerEnd);
-        SpawnFlash(muzzlePosition);
+        AddIfTracked(spawnedObjects, SpawnTracer(muzzlePosition, tracerEnd));
+        AddIfTracked(spawnedObjects, SpawnFlash(muzzlePosition));
 
-        if (!didHit) return;
+        if (!didHit) return spawnedObjects;
 
-        SpawnImpact(endPoint, hitNormal);
+        AddIfTracked(spawnedObjects, SpawnImpact(endPoint, hitNormal));
 
         if (targetNetworkObjectId != 0 &&
             NetworkManager != null && NetworkManager.SpawnManager != null &&
             NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(targetNetworkObjectId, out var target))
         {
-            SpawnSplat(target.transform, endPoint, hitNormal);
+            AddIfTracked(spawnedObjects, SpawnSplat(target.transform, endPoint, hitNormal, predicted));
         }
+
+        return spawnedObjects;
+    }
+
+    void RollbackPredictedShot(int shotId)
+    {
+        if (!predictedShotObjects.TryGetValue(shotId, out var objects))
+            return;
+
+        foreach (var go in objects)
+        {
+            if (go != null)
+                Destroy(go);
+        }
+
+        predictedShotObjects.Remove(shotId);
+    }
+
+    static void AddIfTracked(List<GameObject> list, GameObject go)
+    {
+        if (list != null && go != null)
+            list.Add(go);
     }
 
     Material GetFxMaterial()
@@ -177,7 +318,7 @@ public class PaintGun : NetworkBehaviour
         return fxMaterial;
     }
 
-    void SpawnTracer(Vector3 from, Vector3 to)
+    GameObject SpawnTracer(Vector3 from, Vector3 to)
     {
         var go = new GameObject("ShotTracer");
         var line = go.AddComponent<LineRenderer>();
@@ -193,9 +334,10 @@ public class PaintGun : NetworkBehaviour
         line.sharedMaterial = GetFxMaterial();
 
         Destroy(go, tracerTime);
+        return go;
     }
 
-    void SpawnFlash(Vector3 position)
+    GameObject SpawnFlash(Vector3 position)
     {
         var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         var collider = go.GetComponent<Collider>();
@@ -207,9 +349,10 @@ public class PaintGun : NetworkBehaviour
         go.GetComponent<Renderer>().sharedMaterial = GetFxMaterial();
 
         Destroy(go, flashTime);
+        return go;
     }
 
-    void SpawnImpact(Vector3 point, Vector3 normal)
+    GameObject SpawnImpact(Vector3 point, Vector3 normal)
     {
         var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         var collider = go.GetComponent<Collider>();
@@ -221,13 +364,16 @@ public class PaintGun : NetworkBehaviour
         go.GetComponent<Renderer>().sharedMaterial = GetFxMaterial();
 
         Destroy(go, impactTime);
+        return go;
     }
 
-    void SpawnSplat(Transform parent, Vector3 point, Vector3 normal)
+    GameObject SpawnSplat(Transform parent, Vector3 point, Vector3 normal, bool predicted)
     {
         var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
         var collider = quad.GetComponent<Collider>();
         if (collider != null) Destroy(collider);
+
+        quad.name = predicted ? "PredictedShotSplat" : "ShotSplat";
 
         if (parent != null)
             quad.transform.SetParent(parent, true);
@@ -237,23 +383,54 @@ public class PaintGun : NetworkBehaviour
         quad.transform.localScale = Vector3.one * 0.55f;
 
         var renderer = quad.GetComponent<Renderer>();
-        if (splatMaterial == null)
+        if (predicted)
         {
-            Material template = null;
-            var gunRenderer = GetComponentInParent<Renderer>();
-            if (gunRenderer != null) template = gunRenderer.sharedMaterial;
-            if (template == null) template = renderer.sharedMaterial;
+            if (predictedSplatMaterial == null)
+            {
+                predictedSplatMaterial = CreateSplatMaterial(renderer.sharedMaterial, new Color(1f, 0.9f, 0.15f));
+            }
 
-            splatMaterial = new Material(template);
-            splatMaterial.color = new Color(1f, 0.25f, 0.65f);
+            renderer.sharedMaterial = predictedSplatMaterial;
         }
-        renderer.sharedMaterial = splatMaterial;
+        else
+        {
+            if (splatMaterial == null)
+                splatMaterial = CreateSplatMaterial(renderer.sharedMaterial, new Color(1f, 0.25f, 0.65f));
+
+            renderer.sharedMaterial = splatMaterial;
+        }
 
         Destroy(quad, 5f);
+        return quad;
+    }
+
+    Material CreateSplatMaterial(Material fallback, Color color)
+    {
+        Material template = null;
+        var gunRenderer = GetComponentInParent<Renderer>();
+        if (gunRenderer != null) template = gunRenderer.sharedMaterial;
+        if (template == null) template = fallback;
+
+        var material = new Material(template);
+        material.color = color;
+        return material;
     }
 
     void OnGUI()
     {
+        if (IsOwner && workshopExerciseEnabled)
+        {
+            if (hintStyle == null)
+            {
+                hintStyle = new GUIStyle(GUI.skin.label) { fontSize = 12 };
+                hintStyle.normal.textColor = new Color(1f, 0.9f, 0.3f, 0.9f);
+            }
+
+            GUI.Label(new Rect(26f, 78f, 520f, 44f),
+                $"Workshop latency: {simulatedServerDelay:0.00}s server delay | prediction {(predictLocalShot ? "ON" : "OFF")} | rollback {(rollbackPredictedShot ? "ON" : "OFF")}",
+                hintStyle);
+        }
+
         if (health != null && health.IsDead) return;
         if (aimCamera == null) return;
 
@@ -291,4 +468,6 @@ public class PaintGun : NetworkBehaviour
 
         GUI.color = previous;
     }
+
+    GUIStyle hintStyle;
 }

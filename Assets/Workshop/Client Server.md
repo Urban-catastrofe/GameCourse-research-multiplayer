@@ -1,7 +1,5 @@
 # Client-server: getting Join to work
 
-**Part of the Simme workshop · 20 to 25 minutes**
-
 **Server:** `tank.simmeprive.nl:7777` · **Unity:** 6000.5.9f1
 
 ## What you're doing
@@ -104,17 +102,6 @@ Implement all three regions before you test. If you only restore some of them, y
 
 A wrong port usually produces a timeout rather than an explicit rejection. A timeout means no successful connection was confirmed. It doesn't tell you exactly where the request failed, so don't read too much into it.
 
-## Done checklist
-
-- [ ] Join uses the host and port from the panel and calls `StartClient()`.
-- [ ] The UI shows Connecting while waiting, not Connected immediately.
-- [ ] A connection callback leads to Connected and a spawned tank.
-- [ ] Another student's tank is visible in the same session.
-- [ ] Leave then Join works without restarting Play mode.
-- [ ] Bonus: an unused endpoint eventually produces a failure; the correct one works again.
-
-Movement and shots may not work for other players yet. That's Max's and Niels's part, so don't rebuild the server or edit their exercise code to compensate.
-
 ## Troubleshooting
 
 | Symptom | What to check |
@@ -174,10 +161,6 @@ private void HandleDisconnected(ulong _)
 }
 ```
 
-## Discuss with your partner
-
-1. Why call `StartClient()` instead of `StartHost()`?
-2. Why can `StartClient()` return true before you're actually connected?
 3. Who decides whether you're allowed to join, and where your tank spawns?
 4. Why doesn't connecting automatically synchronize every field on your tank?
 

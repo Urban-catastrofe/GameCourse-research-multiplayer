@@ -1,3 +1,8 @@
+1. Uncomment FireServerRpc()
+2. Uncomment ShotFxClientRpc()
+
+----------------
+
 1. Navigate to PaintGun.cs
 2. Go to the targetHealth.ApplyDamage() function
 3. Add the correct RPC-tag

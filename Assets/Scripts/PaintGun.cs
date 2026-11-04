@@ -108,53 +108,53 @@ public class PaintGun : NetworkBehaviour
         }
 
         Vector3 muzzlePosition = muzzle != null ? muzzle.position : origin;
-        FireServerRpc(targetNetworkObjectId, muzzlePosition, endPoint, hitNormal, didHit);
+        //FireServerRpc(targetNetworkObjectId, muzzlePosition, endPoint, hitNormal, didHit);
     }
+
+    
+    //void FireServerRpc(ulong targetNetworkObjectId, Vector3 muzzlePosition, Vector3 endPoint,
+    //    Vector3 hitNormal, bool didHit, RpcParams rpcParams = default)
+    //{
+    //    if (targetNetworkObjectId != 0 &&
+    //        NetworkManager != null && NetworkManager.SpawnManager != null &&
+    //        NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(targetNetworkObjectId, out var target) &&
+    //        target.TryGetComponent<TankHealth>(out var targetHealth))
+    //    {
+    //       // targetHealth.ApplyDamage(TODO: geef juiste values mee);
+    //    }
+
+    //    ShotFxClientRpc(targetNetworkObjectId, muzzlePosition, endPoint, hitNormal, didHit);
+    //}
 
     //TODO: Add the right RPC-tag
-    void FireServerRpc(ulong targetNetworkObjectId, Vector3 muzzlePosition, Vector3 endPoint,
-        Vector3 hitNormal, bool didHit, RpcParams rpcParams = default)
-    {
-        if (targetNetworkObjectId != 0 &&
-            NetworkManager != null && NetworkManager.SpawnManager != null &&
-            NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(targetNetworkObjectId, out var target) &&
-            target.TryGetComponent<TankHealth>(out var targetHealth))
-        {
-           // targetHealth.ApplyDamage(TODO: geef juiste values mee);
-        }
+    //void ShotFxClientRpc(ulong targetNetworkObjectId, Vector3 muzzlePosition, Vector3 endPoint,
+    //    Vector3 hitNormal, bool didHit)
+    //{
+    //    // The camera sits behind the tank, so when a target is very close the
+    //    // ray can hit in front of the muzzle - stretch the tracer so it never
+    //    // points backwards.
+    //    Vector3 tracerEnd = endPoint;
+    //    Vector3 delta = tracerEnd - muzzlePosition;
+    //    if (delta.sqrMagnitude < 1f)
+    //    {
+    //        Vector3 fallback = muzzle != null ? muzzle.forward : transform.forward;
+    //        tracerEnd = muzzlePosition + (delta.sqrMagnitude > 0.0001f ? delta.normalized : fallback) * 6f;
+    //    }
 
-        ShotFxClientRpc(targetNetworkObjectId, muzzlePosition, endPoint, hitNormal, didHit);
-    }
+    //    SpawnTracer(muzzlePosition, tracerEnd);
+    //    SpawnFlash(muzzlePosition);
 
-    //TODO: Add the right RPC-tag
-    void ShotFxClientRpc(ulong targetNetworkObjectId, Vector3 muzzlePosition, Vector3 endPoint,
-        Vector3 hitNormal, bool didHit)
-    {
-        // The camera sits behind the tank, so when a target is very close the
-        // ray can hit in front of the muzzle - stretch the tracer so it never
-        // points backwards.
-        Vector3 tracerEnd = endPoint;
-        Vector3 delta = tracerEnd - muzzlePosition;
-        if (delta.sqrMagnitude < 1f)
-        {
-            Vector3 fallback = muzzle != null ? muzzle.forward : transform.forward;
-            tracerEnd = muzzlePosition + (delta.sqrMagnitude > 0.0001f ? delta.normalized : fallback) * 6f;
-        }
+    //    if (!didHit) return;
 
-        SpawnTracer(muzzlePosition, tracerEnd);
-        SpawnFlash(muzzlePosition);
+    //    SpawnImpact(endPoint, hitNormal);
 
-        if (!didHit) return;
-
-        SpawnImpact(endPoint, hitNormal);
-
-        if (targetNetworkObjectId != 0 &&
-            NetworkManager != null && NetworkManager.SpawnManager != null &&
-            NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(targetNetworkObjectId, out var target))
-        {
-            SpawnSplat(target.transform, endPoint, hitNormal);
-        }
-    }
+    //    if (targetNetworkObjectId != 0 &&
+    //        NetworkManager != null && NetworkManager.SpawnManager != null &&
+    //        NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(targetNetworkObjectId, out var target))
+    //    {
+    //        SpawnSplat(target.transform, endPoint, hitNormal);
+    //    }
+    //}
 
     Material GetFxMaterial()
     {

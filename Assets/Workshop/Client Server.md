@@ -163,5 +163,3 @@ private void HandleDisconnected(ulong _)
 
 3. Who decides whether you're allowed to join, and where your tank spawns?
 4. Why doesn't connecting automatically synchronize every field on your tank?
-
-**Next up: Max. Now that we're sharing a session, let's make movement visible to everyone.**

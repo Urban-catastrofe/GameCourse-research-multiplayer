@@ -155,6 +155,7 @@ GameObject:
   - component: {fileID: 1766921282985690363}
   - component: {fileID: 4853835492682782384}
   - component: {fileID: 181510631711639322}
+  - component: {fileID: 2503244499680113845}
   m_Layer: 0
   m_Name: HoverVehicleRoot
   m_TagString: Untagged
@@ -324,6 +325,30 @@ MonoBehaviour:
   barHeight: 2.6
   barSize: {x: 140, y: 16}
   barScale: 0.01
+--- !u!114 &2503244499680113845
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1159997495985553760}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8d0727d5ae3244e3b569694d3912374, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkAnimator
+  ShowTopMostFoldoutHeaderGroup: 1
+  NetworkAnimatorExpanded: 0
+  AuthorityMode: 1
+  m_Animator: {fileID: 655728225149020974}
+  TransitionStateInfoList: []
+  AnimatorParameterEntries:
+    ParameterEntries:
+    - name: AnimationSpeed
+      NameHash: -861403450
+      Synchronize: 0
+      ParameterType: 1
+  AnimatorParametersExpanded: 0
 --- !u!1 &1175143999519534607
 GameObject:
   m_ObjectHideFlags: 0

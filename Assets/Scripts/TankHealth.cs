@@ -20,8 +20,8 @@ public class TankHealth : NetworkBehaviour
     List<string> killfeedMessages = new List<string>();
 
     private int healthWithoutNetworkVariable = 100;
-    //readonly NetworkVariable<int> health = new NetworkVariable<int>(
-    //  100, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    readonly NetworkVariable<int> health = new NetworkVariable<int>(
+        100, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server); // Keep declared to match the server.
     readonly NetworkVariable<int> kills = new NetworkVariable<int>(
         0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     readonly NetworkVariable<bool> dead = new NetworkVariable<bool>(

@@ -1,64 +1,53 @@
-# Client-server: make Join work
+# Client-server: getting Join to work
 
-**Part:** Simme · **Time:** 20–25 minutes
+**Part of the Simme workshop · 20 to 25 minutes**
 
 **Server:** `tank.simmeprive.nl:7777` · **Unity:** 6000.5.9f1
 
-## Goal
+## What you're doing
 
-Restore the Join button so your client can join the central server, report the
-result, and join again after leaving. Finish with your tank and another player's
-tank visible. Max's next section handles movement synchronization; Niels then
-handles shot events with RPCs, and Sacha covers latency and rollback.
+In this exercise you'll fix the Join button on your client so it can connect to the central server, report what happened, and let you join again after leaving. By the end you should see your own tank plus the tank of another player in the scene.
 
-The central server is already running. This exercise only changes your local client.
+The central server is already running, so you only change your local client. Max handles movement sync in the next section, Niels takes shot events with RPCs after that, and Sacha covers latency and rollback.
 
-## What are we building on?
+## Background for people who've never touched Netcode
 
-- The server runs the shared scene, knows the network player prefab, listens on
-  a UDP port, and decides whether to admit each client.
-- Everyone connects to the same address and port. A local host would create a
-  separate session, not join the class.
-- Each build already contains the scripts and prefabs. NGO sends spawn/state/event
-  messages, not GameObjects or script files. Clients create local representations.
-- Our server checks compatibility and capacity, assigns a spawn, and asks NGO to
-  create the player object. Those parts are already implemented.
-- Gameplay communication goes through the server. Connecting enables that
-  communication; movement synchronization and shot RPCs are the next exercises.
+If this is your first time with Unity Netcode for GameObjects, here's the short version of what's going on:
 
-## Follow the Join button
+- The server runs the shared scene. It knows which prefab represents a player, listens on a UDP port, and decides whether to let each client in.
+- Everyone connects to the same address and port. If you started a local host instead you'd create a separate session that only you can see, which defeats the point of the exercise.
+- Each build already contains the scripts and prefabs. NGO does not send GameObjects or script files over the network. It sends spawn, state, and event messages, and each client creates its own local copies of the objects it needs.
+- The server checks whether your build is compatible and whether there is room, then assigns you a spawn point and asks NGO to create your player object. All of that is already implemented.
+- Gameplay communication goes through the server. Connecting is what enables that communication. Movement and shooting come later.
 
-```text
-ConnectionView: read host/port → controller.Join()
+One thing that trips people up: **starting the client is not the same as being connected.** `StartClient()` can return `true` while the connection is still in progress. The only thing that confirms you are actually connected is the connection callback firing.
+
+## How the flow works
+
+```
+ConnectionView reads host and port, then calls controller.Join()
     ↓
-ClientConnectionController.JoinRoutine
-    configure destination → StartClient() → wait for NGO's result
+ClientConnectionController.JoinRoutine configures the destination,
+starts the client, and waits for NGO's result
     ↓
-Central server: approve or reject; create player on approval
+Central server approves or rejects, and creates your player on approval
     ↓
-Client callbacks: connected / disconnected + reason → UI feedback
+Client callbacks fire (connected / disconnected with reason), UI updates
 ```
 
-**Starting the client is not the same as being connected.** `StartClient()` can
-return `true` while the connection is still in progress. Only the connection
-callback confirms that the local client connected.
+## What's missing in the code
 
-## What is missing?
-
-Open `Assets/Scripts/Networking/Client/ClientConnectionController.cs`.
-There are three TODO regions:
+Open `Assets/Scripts/Networking/Client/ClientConnectionController.cs`. You'll find three TODO regions:
 
 1. In `JoinRoutine`: configure the destination and start the client.
 2. In `HandleConnected`: record NGO's success notification.
-3. In `HandleDisconnected`: capture failure/disconnection and its reason.
+3. In `HandleDisconnected`: capture failure or disconnection, along with the reason.
 
-The callback subscriptions in `Initialize`, waiting loop, timeout, UI, Leave,
-and cleanup are supplied. **Do not change `Protocol.cs` or the server code.**
-There is no binary serialization task.
+Everything else is already in place. The callback subscriptions in `Initialize`, the waiting loop, the timeout handling, the UI updates, Leave, and cleanup are all supplied. Don't change `Protocol.cs` or the server code. There's no binary serialization task in this exercise either.
 
-## Step 1 — Request a connection
+## Step 1: Request a connection
 
-In `JoinRoutine`, find this starter block:
+In `JoinRoutine` you'll find this starter block:
 
 ```csharp
 SetState(ConnectionState.Connecting, "Connecting to " + Host + ":" + Port + "...");
@@ -73,17 +62,14 @@ if (!clientStarted)
 }
 ```
 
-Replace the TODO and placeholder with two calls:
+Replace the TODO and the placeholder with two calls:
 
-- `transport.ApplyClientEndpoint(Host, Port, nm)` uses the values from the Join
-  panel. This supplied helper configures UnityTransport and attaches the
-  existing compatibility data. You do not need to encode anything yourself.
-- `nm.StartClient()` starts the client. Store its return value in `clientStarted`
-  so the supplied failure check still works.
+- `transport.ApplyClientEndpoint(Host, Port, nm)` uses the values from the Join panel. This helper is already supplied and does two things for you: it configures UnityTransport with the right address and port, and it attaches the existing compatibility data. You don't need to encode anything yourself.
+- `nm.StartClient()` starts the client. Store its return value in `clientStarted` so the supplied failure check still works.
 
-Leave the waiting loop below this block intact. **Do not set `InGame` here.**
+Leave the waiting loop below this block as it is. Don't set `InGame` here. The waiting loop does that once it sees the connection succeeded.
 
-## Step 2 — Recognize success
+## Step 2: Recognize success
 
 `Initialize` already subscribes these methods to NGO:
 
@@ -92,70 +78,60 @@ nm.OnClientConnectedCallback += HandleConnected;
 nm.OnClientDisconnectCallback += HandleDisconnected;
 ```
 
-Restore `HandleConnected` so it sets `sawConnected` to `true`. The supplied
-waiting loop sees this flag, changes the state to `InGame`, and shows the
-connected address. This controller is used as a client for this exercise.
+Restore `HandleConnected` so it sets `sawConnected` to `true`. The waiting loop that's already in place watches this flag, switches the state to `InGame`, and shows the connected address. For this exercise the controller is only used as a client.
 
-## Step 3 — Recognize failure and disconnection
+## Step 3: Recognize failure and disconnection
 
-Keep the guard at the start of `HandleDisconnected`. Below it:
+Keep the guard at the start of `HandleDisconnected`. Below it, do three things:
 
 - Set `sawDisconnected` to `true` so the waiting loop stops waiting.
 - Save `nm.DisconnectReason` in `lastDisconnectReason` (or `null` if `nm` is null).
-- If we were already `InGame`, change the state to `Failed` and show the reason.
-  Use `"server closed the connection"` when no reason was provided.
+- If we were already `InGame`, change the state to `Failed` and show the reason. If there's no reason, use `"server closed the connection"` instead.
 
-The full solution below shows the exact code. Intentional Leave is handled
-separately by the supplied code; it should not become a failure message.
+Intentional Leave is handled separately by the supplied code, so it won't turn into a failure message.
 
-## Test against the central server
+## Testing against the central server
 
-Implement all three regions before testing. With only some restored, a tank may
-briefly appear while the controller still times out because it missed a callback.
+Implement all three regions before you test. If you only restore some of them, you might see a tank briefly appear while the controller still times out because it missed a callback.
 
 1. Open `Assets/Scenes/SampleScene.unity` and press Play.
-2. Enter host **`tank.simmeprive.nl`**, port **`7777`**, then press **Join**.
-3. Confirm the panel shows **Connected to tank.simmeprive.nl:7777** and a tank spawns.
-4. Ask a classmate to join the same server. Check that both tanks are visible.
-5. Press **Leave**, then **Join** again without
-   leaving Play mode. You should reconnect.
-6. **Bonus:** Leave. Try a deliberately unused port (ask the presenter which one). Confirm
-   the UI eventually reports failure instead of claiming you are connected.
-7. Restore **7777** and join successfully again.
+2. Enter host `tank.simmeprive.nl`, port `7777`, then press Join.
+3. Check that the panel says "Connected to tank.simmeprive.nl:7777" and that your tank spawns.
+4. Ask someone else in the room to join the same server. Both tanks should now be visible.
+5. Press Leave, then Join again without exiting Play mode. You should reconnect.
+6. Bonus: leave, then try a deliberately unused port (ask the presenter which one). The UI should eventually report a failure instead of claiming you're connected.
+7. Restore port 7777 and join successfully again.
 
-A wrong port usually produces a timeout, not an explicit rejection. A timeout
-means **no successful connection was confirmed**; it does not prove exactly
-where the request failed.
+A wrong port usually produces a timeout rather than an explicit rejection. A timeout means no successful connection was confirmed. It doesn't tell you exactly where the request failed, so don't read too much into it.
 
 ## Done checklist
 
-- [ ] Join uses the host/port from the panel and calls `StartClient()`.
-- [ ] The UI says Connecting while waiting, not Connected immediately.
+- [ ] Join uses the host and port from the panel and calls `StartClient()`.
+- [ ] The UI shows Connecting while waiting, not Connected immediately.
 - [ ] A connection callback leads to Connected and a spawned tank.
 - [ ] Another student's tank is visible in the same session.
-- [ ] Leave → Join works without restarting Play mode.
+- [ ] Leave then Join works without restarting Play mode.
 - [ ] Bonus: an unused endpoint eventually produces a failure; the correct one works again.
 
-Movement and shots may not yet work for other players. That is the handoff to
-Max and Niels, not a reason to rebuild the server or edit their exercise code.
+Movement and shots may not work for other players yet. That's Max's and Niels's part, so don't rebuild the server or edit their exercise code to compensate.
 
 ## Troubleshooting
 
-| What you see | Check |
+| Symptom | What to check |
 |---|---|
-| `Could not start the client` immediately | TODO 1 still uses `false`, or NGO could not start; inspect the Console |
-| Tank appears, then UI reports failure | `HandleConnected` must set `sawConnected`; check callback subscriptions |
-| `server not reachable` / timeout | Destination, UDP reachability, supplied timeout, and callback handling; this is not a precise network diagnosis |
-| `join:bad` / `join:version` | Server rejected compatibility data; restore the supplied protocol/helper and correct build version |
-| `join:full` | Server capacity reached; ask the presenter or wait for a slot |
-| Connected but no tank / prefab errors | Check the Console and the workshop scene/prefab versions |
-| Other tank visible but movement/shots wrong | Continue with Max's and Niels's sections |
+| `Could not start the client` immediately | TODO 1 still uses `false`, or NGO couldn't start. Check the Console. |
+| Tank appears briefly, then UI reports failure | `HandleConnected` must set `sawConnected`. Check the callback subscriptions. |
+| `server not reachable` or timeout | Destination, UDP reachability, the supplied timeout, and callback handling. This isn't a precise network diagnosis. |
+| `join:bad` or `join:version` | Server rejected the compatibility data. Restore the supplied protocol and helper, and check your build version. |
+| `join:full` | Server is at capacity. Ask the presenter or wait for a slot. |
+| Connected but no tank, or prefab errors | Check the Console and the workshop scene and prefab versions. |
+| Other tank visible but movement or shots wrong | That's expected. Continue with Max's and Niels's sections. |
 
-## Full solution — three regions in the same file
+## Full solution
 
 ### 1. Inside `JoinRoutine`
 
-Keep the rest of the method. Replace its TODO block with:
+Keep the rest of the method. Replace the TODO block with:
 
 ```csharp
 transport.ApplyClientEndpoint(Host, Port, nm);
@@ -198,11 +174,11 @@ private void HandleDisconnected(ulong _)
 }
 ```
 
-## Explain it to your partner
+## Discuss with your partner
 
-1. Why call `StartClient()` rather than `StartHost()`?
-2. Why can `StartClient()` return true before we are connected?
-3. Who decides whether we may join and where our tank spawns?
-4. Why does connecting not automatically synchronize every field on our tank?
+1. Why call `StartClient()` instead of `StartHost()`?
+2. Why can `StartClient()` return true before you're actually connected?
+3. Who decides whether you're allowed to join, and where your tank spawns?
+4. Why doesn't connecting automatically synchronize every field on your tank?
 
-**Next: Max — we share a session; now make movement visible to everyone.**
+**Next up: Max. Now that we're sharing a session, let's make movement visible to everyone.**

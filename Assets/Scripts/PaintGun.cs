@@ -1,3 +1,4 @@
+using NUnit.Framework;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -110,7 +111,7 @@ public class PaintGun : NetworkBehaviour
         FireServerRpc(targetNetworkObjectId, muzzlePosition, endPoint, hitNormal, didHit);
     }
 
-    [Rpc(SendTo.Server)]
+    //TODO: Add the right RPC-tag
     void FireServerRpc(ulong targetNetworkObjectId, Vector3 muzzlePosition, Vector3 endPoint,
         Vector3 hitNormal, bool didHit, RpcParams rpcParams = default)
     {
@@ -119,13 +120,13 @@ public class PaintGun : NetworkBehaviour
             NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(targetNetworkObjectId, out var target) &&
             target.TryGetComponent<TankHealth>(out var targetHealth))
         {
-            targetHealth.ApplyDamage(damage, rpcParams.Receive.SenderClientId);
+           // targetHealth.ApplyDamage(TODO: geef juiste values mee);
         }
 
         ShotFxClientRpc(targetNetworkObjectId, muzzlePosition, endPoint, hitNormal, didHit);
     }
 
-    [Rpc(SendTo.ClientsAndHost)]
+    //TODO: Add the right RPC-tag
     void ShotFxClientRpc(ulong targetNetworkObjectId, Vector3 muzzlePosition, Vector3 endPoint,
         Vector3 hitNormal, bool didHit)
     {
